@@ -1,18 +1,193 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, maximum-scale=1.0" />
-
-    <title>Example Student's HCDE 439 Physical Computing Page!</title>
-
+    <title>Khamesh Mittal's HCDE 439 Physical Computing Page!</title>
     <link href="style.css" rel="stylesheet" type="text/css" />
   </head>
+
   <body>
-    <h1>Example Student's Assignment 1!</h1>
+    <h1>Khamesh Mittal's Assignment 1!</h1>
+
     <div class="header">
-      <img src="red-panda.jpg" />
-      <p>Here is all the documentation for assignment 1!</p>
+      <img src="A1schematic.png" alt="Assignment header image" />
+      <p>Documentation page for the Arduino LED blinking circuit assignment.</p>
     </div>
+
+    <hr />
+
+    <h2>Circuit Overview</h2>
+    <p>
+      I built a parallel circuit with three LEDs (Red, Blue, Yellow). Each LED has its own resistor,
+      and its anode connects to a different Arduino digital pin so each LED can blink independently.
+      The cathodes are all connected to ground (GND).
+    </p>
+    <ul>
+      <li>Red LED → resistor → Arduino pin 13</li>
+      <li>Blue LED → resistor → Arduino pin 12</li>
+      <li>Yellow LED → resistor → Arduino pin 8</li>
+      <li>All LED cathodes → GND</li>
+    </ul>
+    <figure>
+      <img src="Blink.gif" alt="Animated GIF showing LEDs blinking in sequence." />
+      <figcaption>Figure 1. Animated operation of the LED blinking circuit.</figcaption>
+    </figure>
+
+
+    <h2>Circuit Schematic</h2>
+    <figure>
+      <img
+        src="A1schematic.png"
+        alt="Circuit schematic showing Arduino Uno with three LEDs and resistors in parallel."
+      />
+      <figcaption>
+        Figure 1. Schematic diagram of the Arduino circuit with three LEDs and resistors.
+      </figcaption>
+    </figure>
+    <p>
+      Each LED has its own resistor to limit current. The anodes connect to digital pins 13, 12, 8, and
+      the cathodes connect to GND.
+    </p>
+
+    <h2>Resistor Calculations (Ohm’s Law)</h2>
+    <p>
+      Supply voltage (V<sub>S</sub>) = 5V<br />
+      Recommended current (I) = 16 mA = 0.016 A<br />
+      R = V / I, where V is the voltage across the resistor.
+    </p>
+
+    <h3>Red and Yellow LEDs</h3>
+    <ul>
+      <li>Forward voltage (V<sub>F</sub>) = 1.8V</li>
+      <li>Voltage across resistor = 5 - 1.8 = 3.2V</li>
+      <li>R = 3.2 / 0.016 = 200 Ω</li>
+      <li>Used 220 Ω (common value, slightly safer and limits current a bit more)</li>
+    </ul>
+
+    <h3>Blue LED</h3>
+    <ul>
+      <li>Forward voltage (V<sub>F</sub>) = 3.3V</li>
+      <li>Voltage across resistor = 5 - 3.3 = 1.7V</li>
+      <li>R = 1.7 / 0.016 = 106.25 Ω</li>
+      <li>Used 120 Ω (common value)</li>
+    </ul>
+
+    <h2>Arduino Code (Each line explained above it)</h2>
+    <pre><code>
+// the setup function runs once when you press reset or power the board
+int redPin = 13;
+int bluePin = 12;
+int yellowPin = 8;
+
+void setup() {
+  // set the red LED pin as an output
+  pinMode(redPin, OUTPUT);
+  // set the blue LED pin as an output
+  pinMode(bluePin, OUTPUT);
+  // set the yellow LED pin as an output
+  pinMode(yellowPin, OUTPUT);
+}
+
+void loop() {
+  // turn on the yellow LED
+  digitalWrite(yellowPin, HIGH);
+  // wait for 100 milliseconds
+  delay(100);
+  // turn off the yellow LED
+  digitalWrite(yellowPin, LOW);
+  // wait for 100 milliseconds
+  delay(100);
+
+  // turn on the yellow LED again
+  digitalWrite(yellowPin, HIGH);
+  // wait for 100 milliseconds
+  delay(100);
+  // turn off the yellow LED
+  digitalWrite(yellowPin, LOW);
+  // wait for 300 milliseconds before the next LED
+  delay(300);
+
+  // turn on the red LED
+  digitalWrite(redPin, HIGH);
+  // wait for 100 milliseconds
+  delay(100);
+  // turn off the red LED
+  digitalWrite(redPin, LOW);
+  // wait for 100 milliseconds
+  delay(100);
+
+  // turn on the red LED again
+  digitalWrite(redPin, HIGH);
+  // wait for 100 milliseconds
+  delay(100);
+  // turn off the red LED
+  digitalWrite(redPin, LOW);
+  // wait for 300 milliseconds before the next LED
+  delay(300);
+
+  // turn on the blue LED
+  digitalWrite(bluePin, HIGH);
+  // wait for 100 milliseconds
+  delay(100);
+  // turn off the blue LED
+  digitalWrite(bluePin, LOW);
+  // wait for 100 milliseconds
+  delay(100);
+
+  // turn on the blue LED again
+  digitalWrite(bluePin, HIGH);
+  // wait for 100 milliseconds
+  delay(100);
+  // turn off the blue LED
+  digitalWrite(bluePin, LOW);
+  // wait for 300 milliseconds before the cycle repeats
+  delay(300);
+}
+    </code></pre>
+
+
+    <h2>Timing Graph: LED Voltage vs. Time</h2>
+    <figure>
+      <img
+        src="a1graph.png"
+        alt="Timing graph showing LED voltage vs. time for red, blue, and yellow LEDs blinking independently."
+      />
+      <figcaption>Figure 2. Voltage across each LED over time.</figcaption>
+    </figure>
+    <p>
+      The X-axis represents time and the Y-axis represents voltage across each LED. Each trace shows
+      when the LED is ON (≈V<sub>F</sub>) or OFF (≈0V). The square waves are slightly phase-shifted
+      to show independent blinking.
+    </p>
+
+    <h2>Additional Questions</h2>
+
+    <h3>2) How many LEDs could you blink independently, and how much current?</h3>
+    <p>
+      I was able to get 13 LEDs to blink independently. Each draws around 16 mA, so the total ideal
+      current would be 13 × 16 mA = 208 mA. Since the Arduino Uno can safely source about 200 mA
+      total, the current would distribute roughly evenly—around 15.4 mA per LED.
+    </p>
+
+    <h3>3) How many if only one LED is on at once?</h3>
+    <p>
+      If only one LED is on at a time, the number of independently controlled LEDs is limited by
+      available pins—about 20 (using D2–D13 and A0–A5). The current draw would then just be that of
+      a single LED (about 10–16 mA).
+    </p>
+
+    <h3>4) Blink speed threshold (persistence of vision)</h3>
+    <p>
+      Around a 10 ms delay per state (100 Hz) the blinking appears steady to the human eye.
+      Increasing the delay to around 15 ms makes the blinking visible again.
+    </p>
+
+    <h3>5) Use of AI Tools</h3>
+    <p>
+      Yes. I used AI tools to help check my resistor calculations with Ohm’s Law, verify my parallel
+      circuit wiring, format this documentation, and create the Arduino code comments. I confirmed
+      all final values and code behavior independently.
+    </p>
   </body>
 </html>
