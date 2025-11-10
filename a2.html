@@ -1,18 +1,195 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, maximum-scale=1.0" />
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, maximum-scale=1.0" />
+  <title>Assignment 2 – RGB LED + Button (PWM, Digital I/O)</title>
+</head>
+<body>
+  <h1>Assignment 2 – Fade!</h1>
+  <p>
+    This project uses three LEDs (RGB), a pushbutton, <code>digitalRead()</code>, <code>digitalWrite()</code>,
+    <code>analogWrite()</code>, and a <code>for</code>-loop. One LED channel (blue) fades via PWM.
+    The schematic, circuit photo, operation GIF, code, resistor calculations, and analysis are documented below.
+  </p>
 
-    <title>Example Student's HCDE 439 Physical Computing Page!</title>
+  <hr />
 
-    <link href="style.css" rel="stylesheet" type="text/css" />
-  </head>
-  <body>
-    <h1>Example Student's Assignment 2!</h1>
-    <div class="header">
-      <img src="red-panda.jpg" />
-      <p>Here is all the documentation for assignment 2!</p>
-    </div>
-  </body>
+  <h2>Documentation Images</h2>
+
+  <h3>Schematic</h3>
+  <figure>
+    <img src="Fade_schematic.png" alt="Schematic of Arduino with RGB LED and pushbutton. Red=D13, Green=D10, Blue=D11 with resistors; Button on D2 to GND using INPUT_PULLUP." style="width:50%; height:auto;" />
+    <figcaption>
+      Figure 1. Schematic of the circuit. Each LED channel has its own current-limiting resistor.
+      The pushbutton connects from pin D2 to GND while the internal pull-up limits current and provides a default HIGH.
+    </figcaption>
+  </figure>
+
+  <h3>Circuit Photo</h3>
+  <figure>
+    <img src="A2_circuit photo.png" alt="Breadboard photo of Arduino, RGB LED with three resistors, and a pushbutton wired to D2 and GND." style="width:50%; height:auto;">/>
+    <figcaption>
+      Figure 2. Breadboard build that matches the schematic: Red→D13, Green→D10, Blue→D11 (each through a resistor),
+      common cathode to GND, and button from D2 to GND.
+    </figcaption>
+  </figure>
+
+  <h3>Operation (Animated GIF)</h3>
+  <figure>
+    <img src="A2_Fade.gif" alt="Animated GIF showing default color, and the blue channel fading when the button is pressed." />
+    <figcaption>
+      Figure 3. Operation GIF. By default, all colors are ON. When the button is pressed, red and green stay ON and blue fades smoothly.
+    </figcaption>
+  </figure>
+
+  <h3>Chart: LED Voltage vs Time</h3>
+  <figure>
+
+    <img src="PWM_graph.jpeg" alt="Chart of LED voltage vs time for PWM analogWrite(64), (128), (255)." style="width:50%; height:auto;"/>
+    <figcaption>
+      Figure 4. PWM waveforms for <code>analogWrite(64)</code> (~25%), <code>analogWrite(128)</code> (~50%), and
+      <code>analogWrite(255)</code> (100%). The LED voltage toggles between its forward voltage (~V<sub>f</sub>) and 0 V
+      at the Arduino’s PWM frequency (~490 Hz on most Uno pins).
+    </figcaption>
+  </figure>
+
+  <hr />
+
+ 
+  <h2>Resistor Calculations & Button Current</h2>
+  <p>
+    Supply voltage: 5&nbsp;V. Typical forward voltages: Red ≈ 1.9&nbsp;V, Green ≈ 2.1–3.0&nbsp;V, Blue ≈ 3.3&nbsp;V.
+    Using Ohm’s Law, <em>R = (V<sub>S</sub> − V<sub>F</sub>) / I</em> with a target current of ~10–16 mA:
+  </p>
+  <ul>
+    <li><strong>Red:</strong> R ≈ (5 − 1.8) / 0.016 ≈ 193&nbsp;Ω → used 220&nbsp;</li>
+    <li><strong>Green:</strong> R ≈ (5 − 1.8) / 0.016 ≈ 181&nbsp;Ω → used 220&nbsp;Ω</li>
+    <li><strong>Blue:</strong> R ≈ (5 − 3.3) / 0.016 ≈ 106&nbsp;Ω → used 100&nbsp;Ω</li>
+  </ul>
+
+  <p>
+    <strong>Button current limiting:</strong> The pushbutton is connected between 5 V and the input pin (D2),
+    with a <strong>10 kΩ pull-down resistor</strong> from D2 to ground. When the button is unpressed, the pull-down keeps
+    the input LOW. When pressed, 5 V appears at D2 and current flows through the 10 kΩ resistor to ground.
+    The current is very small: I = 5 V / 10 kΩ ≈ <strong>0.5 mA</strong>, which safely limits current while ensuring
+    a clean logic HIGH signal.
+  </p>
+
+
+  <h2>Firmware (Arduino)</h2>
+
+  <pre><code>// declare pin for the red LED channel (on/off)
+const int redPin = 13;
+// declare pin for the green LED channel (on/off or steady brightness)
+const int greenPin = 10;
+// declare pin for the blue LED channel (PWM fading)
+const int bluePin = 11;
+// declare pin for the pushbutton (wired to GND; use internal pull-up)
+const int buttonPin = 2;
+
+// define setup() to configure pins once on boot
+void setup() {
+  // set red LED pin as OUTPUT
+  pinMode(redPin, OUTPUT);
+  // set green LED pin as OUTPUT
+  pinMode(greenPin, OUTPUT);
+  // set blue LED pin as OUTPUT (supports PWM)
+  pinMode(bluePin, OUTPUT);
+  // set button pin as INPUT_PULLUP (idles HIGH, reads LOW when pressed)
+  pinMode(buttonPin, INPUT_PULLUP);
+
+  // turn all three channels on for a white/default look
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, HIGH);
+  digitalWrite(bluePin, HIGH);
+}
+
+// define loop() to run repeatedly
+void loop() {
+  // read button state (HIGH = not pressed; LOW = pressed)
+  int buttonState = digitalRead(buttonPin);
+
+  // if the button is not pressed, keep all colors on (white)
+  if (buttonState == HIGH) {
+    // ensure red is on
+    digitalWrite(redPin, HIGH);
+    // ensure green is on
+    digitalWrite(greenPin, HIGH);
+    // ensure blue is on
+    digitalWrite(bluePin, HIGH);
+  }
+  // if the button is pressed, keep red+green steady and fade the blue channel
+  else {
+    // make sure red stays on
+    digitalWrite(redPin, HIGH);
+    // make sure green stays on
+    digitalWrite(greenPin, HIGH);
+
+    // fade blue from off to full brightness using a for-loop
+    for (int v = 0; v <= 255; v += 5) {
+      // set PWM value on blue (0..255)
+      analogWrite(bluePin, v);
+      // small delay for a smooth fade
+      delay(20);
+    }
+
+    // fade blue from full brightness back to off using a for-loop
+    for (int v = 255; v >= 0; v -= 5) {
+      // set PWM value on blue (0..255)
+      analogWrite(bluePin, v);
+      // small delay for a smooth fade
+      delay(20);
+    }
+  }
+}
+  </code></pre>
+
+  <hr />
+
+
+  <h2>Additional Questions</h2>
+
+  <h3>1) Chart: LED voltage vs time for analogWrite(64), (128), (255)</h3>
+  <p>
+    I drew the PWM waveforms assuming an LED forward voltage of ~2.0&nbsp;V when ON, and 0&nbsp;V when OFF.
+    Duty cycles:
+  </p>
+  <ul>
+    <li>64/255 ≈ <strong>25%</strong></li>
+    <li>128/255 ≈ <strong>50%</strong></li>
+    <li>255/255 = <strong>100%</strong></li>
+  </ul>
+  <p>
+    The LED’s voltage toggles between ~V<sub>f</sub> and ~0&nbsp;V at the PWM frequency (~490&nbsp;Hz on most Uno pins).
+    See Figure&nbsp;4 (above).
+  </p>
+
+  <h3>2) Battery-life estimate (1200&nbsp;mAh)</h3>
+  <p>
+    Red (220&nbsp;Ω, V drop = 1.8&nbsp;V) ⇒ I≈14.1&nbsp;mA;
+    Green (220&nbsp;Ω, V drop 1.8&nbsp;V) ⇒ I≈13.2&nbsp;mA; Blue (100&nbsp;Ω, V drop = 3.3&nbsp;V) ⇒ I≈14.2&nbsp;mA.
+  </p>
+  <ul>
+    <li><strong>Idle (blue off, red + green steady):</strong> Current ≈ 28.3&nbsp;mA → 1200/28.3 ≈ <strong>42.4 hours</strong> (LEDs only).</li>
+    <li><strong>Pressed (red+green steady, blue fading ~50% duty avg):</strong> Current ≈ 20.8&nbsp;mA → 1200/20.8 ≈ <strong>57.7 hours</strong> (LEDs only).</li>
+  </ul>
+  <p>
+    Real-world lifetime will probably be shorter because I believe the Arduino board itself consumes ~25–35&nbsp;mA.
+  </p>
+
+  <h3>3) Measured LED voltage vs theoretical</h3>
+  <p>
+    The actual measured voltage reading for the red LED was around 2.3V, which is different from the  theoretical voltage mentioned on the datasheet (1.8V).
+    I believe this discrepancy is due to variations in manufacturing, measurement conditions, and the specific current flowing through the LED.
+  </p>
+
+  <h3>4) Use of AI Tools</h3>
+  <p>
+    I used AI tools to help format documentation, clarify PWM duty cycle and battery-life estimates. I verified behavior on hardware and matched the schematic, circuit, and code.
+  </p>
+
+  <hr />
+
+</body>
 </html>
