@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Talking to the Web — Assignment 6</title>
+</head>
+<body>
+  <h1>Talking to the Web — Assignment 6</h1>
+    <p>
+        This project implements a <strong>digital safe</strong> using an Arduino, a 4x4 matrix keypad, and a 16x2 LCD.
+        The user enters a PIN on the keypad to unlock the safe, with feedback shown on the LCD. The system can also
+        communicate with a web page via Serial using the p5.webserial library, allowing remote interaction and status updates.
+  <hr>
+
+  <h2>Schematic</h2>
+  <figure>
+    <img src="A6_Schematic.jpeg" alt="Assignment 6 schematic" width=50% height="auto">
+    <figcaption>Figure 1. Circuit schematic.</figcaption>
+  </figure>
+
+  <h2>Circuit Photo</h2>
+  <figure>
+    <img src="A6_circuit_photo.jpeg" alt="Assignment 6 circuit photo" width=50% height="auto">
+    <figcaption>Figure 2.</figcaption>
+  </figure>
+
+  <h2>Operation (Animated GIF)</h2>
+  <figure>
+    <img src="A6_operation.gif" alt="Assignment 6 operation GIF" width=50% height="auto">
+    <figcaption>Figure 3. Demonstration of the system operation.</figcaption>
+  </figure>
+
+  <hr>
+
+  <h2>Arduino Code</h2>
+  <pre>
+// include LCD library (built-in)
+#include <LiquidCrystal.h>
+// include Keypad library 
+#include <Keypad.h>
+
+// set LCD pin numbers
+int LCD_RS = 12;   
+int LCD_E  = 11;   
+int LCD_D4 = 5;   
+int LCD_D5 = 4;    
+int LCD_D6 = 3;   
+int LCD_D7 = 2;  
+
+// create the LCD object (4-bit mode)
+LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+
+//Keypad (4x4)
+// define matrix size
+const byte ROWS = 4;
+const byte COLS = 4;
+
+// define key labels in the matrix
+char keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+// map row pins (top-to-bottom on your ribbon) to Arduino pins
+byte rowPins[ROWS] = {6, 7, 8, 9};      // R1..R4 -> D6,D7,D8,D9
+// map column pins to Arduino pins
+byte colPins[COLS] = {10, A0, A1, A2};  // C1..C4 -> D10,A0,A1,A2
+
+// create keypad object
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+/* ---------- Reset button ---------- */
+// choose the reset button pin
+const int RESET_PIN = A3;  // button to GND; uses INPUT_PULLUP
+
+/* ---------- Safe state ---------- */
+// set your secret PIN here
+const char* MASTER_PIN = "1234";
+// hold what the user has typed
+String entered = "";
+// track unlocked state
+bool unlocked = false;
+
+// buffer for reading lines from Serial
+String inLine = "";
+
+// show the idle (enter PIN) screen
+void lcdIdle() {
+  // clear old text
+  lcd.clear();
+  // write prompt on first line
+  lcd.setCursor(0, 0);
+  lcd.print("Enter PIN:");
+  // move to second line
+  lcd.setCursor(0, 1);
+  // print stars for each entered digit
+  for (uint8_t i = 0; i < entered.length(); i++) lcd.print('*');
+  // fill rest with spaces
+  for (uint8_t i = entered.length(); i < 16; i++) lcd.print(' ');
+  // inform host over serial (optional)
+  Serial.println("STATE:IDLE");
+}
+
+//reset everything to start state 
+void hardReset() {
+  // erase input
+  entered = "";
+  // lock the safe
+  unlocked = false;
+  // show idle screen
+  lcdIdle();
+}
+
+//check the reset button (active low)
+void handleResetButton() {
+  // read the pin
+  if (digitalRead(RESET_PIN) == LOW) {
+    // perform reset
+    hardReset();
+    // debounce delay
+    delay(180);
+  }
+}
+
+//handle a single line command from Serial
+void handleSerialCommand(const String& s) {
+  // handle "TEXT:line1|line2" to set LCD text (optional)
+  if (s.startsWith("TEXT:")) {
+    // grab payload after "TEXT:"
+    String payload = s.substring(5);
+    // split on '|'
+    int bar = payload.indexOf('|');
+    // init lines
+    String l1 = payload;
+    String l2 = "";
+    // if '|' exists, split into two
+    if (bar >= 0) {
+      l1 = payload.substring(0, bar);
+      l2 = payload.substring(bar + 1);
+    }
+    // clear LCD and print lines
+    lcd.clear();
+    lcd.setCursor(0,0); lcd.print(l1.substring(0,16));
+    lcd.setCursor(0,1); lcd.print(l2.substring(0,16));
+    // echo back
+    Serial.print("TEXT:"); Serial.print(l1); Serial.print("|"); Serial.println(l2);
+  }
+  // clear/reset command
+  else if (s == "CLR" || s == "RESET") {
+    // perform hard reset
+    hardReset();
+  }
+}
+
+//read serial into complete lines 
+void readSerialLines() {
+  // while data available
+  while (Serial.available()) {
+    // read character
+    char c = (char)Serial.read();
+    // check for line end
+    if (c == '\n' || c == '\r') {
+      // if we have content, handle it
+      if (inLine.length()) {
+        handleSerialCommand(inLine);
+        inLine = "";
+      }
+    } else {
+      // append char to buffer
+      inLine += c;
+      // prevent runaway buffer
+      if (inLine.length() > 120) inLine = "";
+    }
+  }
+}
+
+//setup runs once 
+void setup() {
+  // start serial for logs / p5.js
+  Serial.begin(115200);
+  // init LCD in 16x2 mode
+  lcd.begin(16, 2);
+  // greeting line 1
+  lcd.setCursor(0,0); lcd.print("Digital Safe");
+  // greeting line 2
+  lcd.setCursor(0,1); lcd.print("Initializing...");
+  // brief pause
+  delay(700);
+  // configure reset pin with pull-up (no resistor needed)
+  pinMode(RESET_PIN, INPUT_PULLUP);
+  // go to idle screen
+  hardReset();
+}
+
+//main loop 
+void loop() {
+  // check reset button
+  handleResetButton();
+  // read serial commands (optional)
+  readSerialLines();
+
+  // only process keypad if not unlocked
+  if (!unlocked) {
+    // get key from keypad (non-blocking)
+    char k = keypad.getKey();
+    // process if a key is pressed
+    if (k) {
+      // print key to serial so the web page (or you) can see it
+      Serial.print("KEY:"); Serial.println(k);
+
+      // if it's a digit, append (limit length)
+      if (k >= '0' && k <= '9') {
+        if (entered.length() < 8) {
+          entered += k;
+          lcdIdle();
+        }
+      }
+      // '*' acts as backspace
+      else if (k == '*') {
+        if (entered.length() > 0) {
+          entered.remove(entered.length() - 1);
+          lcdIdle();
+        }
+      }
+      // '#' acts as submit
+      else if (k == '#') {
+        // clear lcd to show result
+        lcd.clear();
+        // if correct
+        if (entered.equals(MASTER_PIN)) {
+          // show unlocked
+          lcd.setCursor(0,0); lcd.print("Unlocked!");
+          // notify serial
+          Serial.println("STATE:UNLOCKED");
+          // freeze in unlocked state
+          unlocked = true;
+        } else {
+          // show wrong pin
+          lcd.setCursor(0,0); lcd.print("Wrong PIN");
+          // notify serial
+          Serial.println("STATE:WRONG");
+          // hold briefly
+          delay(1000);
+          // clear typed input
+          entered = "";
+          // back to idle with stars cleared
+          lcdIdle();
+        }
+      }
+      // A/B/C/D are spare—can be used for future features
+    }
+  }
+}
+  </pre>
+
+  <hr>
+
+  <p>
+    <a href="a6_index.html">A6 Demo Page →</a>
+  </p>
+</body>
+</html>

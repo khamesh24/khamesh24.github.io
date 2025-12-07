@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, maximum-scale=1.0" />
+  <title>Assignment 3 – LDR Voltage Divider → RGB LED (PWM)</title>
+</head>
+<body>
+  <h1>Assignment 3 – Light Sensor Controls RGB LED</h1>
+  <p>
+    This project uses a <strong>photoresistor (LDR)</strong> in a <strong>voltage divider</strong> to control an
+    <strong>RGB LED</strong>. The Arduino reads the divider on A0 with <code>analogRead()</code>, constrains and
+    <code>map()</code>s the reading, drives the red channel with <code>analogWrite()</code> (PWM), and prints custom messages to
+    the Serial Monitor. The green and blue channels stay ON to form a mixed color, while the red channel brightness changes with light intensity.
+  </p>
+
+  <hr />
+
+  <h2>Documentation Images</h2>
+
+  <h3>Schematic</h3>
+  <figure>
+    <img src="A3_Schematic.jpeg"
+         alt="Schematic: LDR to 5V, node to A0, 10k to GND. RGB LED on D9/D10/D11 through resistors." style="width:60%; height:auto;" />
+    <figcaption>
+      Figure 1. Circuit schematic
+    </figcaption>
+  </figure>
+
+  <h3>Circuit Photo</h3>
+  <figure>
+    <img src="A3_circuit_photo.jpeg" style="width:30%; height:auto;" />
+    <figcaption>Figure 2. Breadboard photo</figcaption>
+  </figure>
+
+  <h3>Operation (Animated GIF)</h3>
+  <figure>
+    <img src="A3_circuit.gif" style="width:60%; height:auto;" />
+    <figcaption>Figure 3. Covering the LDR dims the red LED; uncovering brightens it.</figcaption>
+  </figure>
+
+
+  <h2>Code (Arduino)</h2>
+  <p>This sketch matches the schematic and behavior described above.</p>
+
+  <pre><code>// pins: red=9, green=10, blue=11; sensor=A0
+const int redLedPin = 9;
+const int greenLedPin = 10;
+const int blueLedPin = 11;
+const int analogInPin = A0;
+
+int sensorValue;   // raw reading from A0
+int mappedValue;   // 0–255 PWM value for red
+
+void setup() {
+  Serial.begin(9600);          // start serial monitor
+  pinMode(redLedPin, OUTPUT);  // configure RGB pins
+  pinMode(greenLedPin, OUTPUT);
+  pinMode(blueLedPin, OUTPUT);
+}
+
+void loop() {
+  sensorValue = analogRead(analogInPin);     // read divider voltage (0–1023)
+  sensorValue = constrain(sensorValue, 500, 830);  // limit to useful range
+
+  Serial.print("Sensor Value: ");            // show raw value
+  Serial.print(sensorValue);
+
+  mappedValue = map(sensorValue, 500, 830, 0, 255); // scale to PWM 0–255
+
+  Serial.print("\tMapped Value: ");          // show mapped result
+  Serial.println(mappedValue);
+
+  analogWrite(redLedPin, mappedValue);       // vary red channel
+  digitalWrite(greenLedPin, HIGH);           // hold green+blue ON
+  digitalWrite(blueLedPin, HIGH);
+}
+  </code></pre>
+
+  <hr />
+
+  <h2>Additional Questions</h2>
+
+  <h3>1) Can the variable resistor be R1 or R2? (with example calculations)</h3>
+  <figure>
+    <img src="A3_Q1.jpeg" alt="Handwritten calculation for R1 vs R2 placement" style="width:60%; height:auto;" />
+    <figcaption>Figure 4. Handwritten calculations showing both configurations of the voltage divider and their ADC values.</figcaption>
+  </figure>
+
+  <h3>2) Plot of V-measure for the GIF</h3>
+  <figure>
+    <img src="A3_Q2.jpeg" alt="voltage vs time graph" style="width:60%; height:auto;" />
+    <figcaption>Figure 5. Hand-drawn graph of voltage over time showing how A0 changes as the LDR is covered and uncovered.</figcaption>
+  </figure>
+
+  <h3>3) If PWM were 10-bit and ADC were 16-bit, how would <code>map()</code> change?</h3>
+  <pre><code>// Current Uno: 10-bit read (0–1023) → 8-bit write (0–255)
+int sensorValue = analogRead(A0);
+int mappedValue  = map(v10, 0, 1023, 0, 255);
+
+// Hypothetical: 16-bit read (0–65535) → 10-bit write (0–1023)
+int sensorValue = analogRead(A0);    // 0–65535 range
+int mappedValue = map(v16, 0, 65535, 0, 1023);
+analogWrite(9, p10);
+
+  <hr />
+</body>
+</html>

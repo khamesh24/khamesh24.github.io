@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, maximum-scale=1.0" />
+  <title>Assignment 4 – Libraries! (Joystick → Servo)</title>
+</head>
+<body>
+
+  <h1>Assignment 4 – Libraries! (Joystick → Servo)</h1>
+
+  <p>
+    For this assignment I used two libraries: <strong>Servo.h</strong> (to control a hobby servo on Pin 9) and the
+    Arduino core analog I/O to read a joystick on <code>A0</code> (X) and <code>A1</code> (Y). 
+    The Y axis limits the travel around center; the X axis chooses the target angle. 
+    I also added a quick center calibration on boot.
+  </p>
+
+  <h2>Documentation Images</h2>
+
+  <h3>Circuit Photo</h3>
+  <img src="A4_circuit_photo.jpeg" alt="Breadboard photo of the joystick + servo circuit" width="600">
+  <p><strong>Figure 1.</strong> Circuit photo. Joystick X→A0, Y→A1, Servo signal→D9, +5V/GND common.</p>
+
+  <h3>Schematic</h3>
+  <img src="A4_Schematic.jpeg" alt="Hand-drawn schematic of joystick to servo using Servo library" width="600">
+  <p><strong>Figure 2.</strong> Schematic. The servo gets 5 V and GND from the Arduino and a control pulse from D9.</p>
+
+  <h3>Operation GIF</h3>
+  <img src="A4_operation.gif" alt="Animated GIF showing the servo sweeping with joystick input" width="600">
+  <p><strong>Figure 3.</strong> Operation GIF. Moving the joystick on X points the servo; Y tightens/loosens the allowed range.</p>
+
+  <h2>Firmware (Arduino)</h2>
+
+  <pre><code>#include &lt;Servo.h&gt;  // adding the Servo library
+
+const int xPin = A0;   // joystick X-axis
+const int yPin = A1;   // joystick Y-axis
+const int servoPin = 9; // servo control pin
+int xCenter;
+const int deadband = 20;
+
+Servo myServo;
+
+void setup() {
+  myServo.attach(servoPin);
+  Serial.begin(9600);
+  int xCenter;
+  const int deadband = 20;
+
+  // --- Calibrate joystick center ---
+  long sum = 0; // store total of samples
+  for (int i = 0; i &lt; 50; i++) { // take 50 readings for accuracy
+    sum += analogRead(xPin); // read joystick X value
+    delay(5);                // small delay between readings
+  }
+  xCenter = sum / 50; // average value will be the center
+  Serial.print("Calibrated Center = ");
+  Serial.println(xCenter);
+}
+
+void loop() {
+  // read the X and Y joystick values (0–1023)
+  int xValue = analogRead(xPin) - xCenter; // subtract the offset
+  int yValue = analogRead(yPin);
+
+  // map X to 0–180° normally
+  int baseAngle = map(xValue, 0, 1023, 0, 180);
+
+  // map Y to a range between 10° (tight limit) and 90° (wide limit)
+  int limitRange = map(yValue, 0, 1023, 10, 90);
+
+  // center point of servo (90°)
+  int minAngle = 90 - limitRange;
+  int maxAngle = 90 + limitRange;
+
+  // constrain the baseAngle to within that range
+  int limitedAngle = constrain(baseAngle, minAngle, maxAngle);
+
+  // moving the servo
+  myServo.write(limitedAngle);
+
+  // printing values to help debug
+  Serial.print("X: "); Serial.print(xValue);
+  Serial.print(" | Y: "); Serial.print(yValue);
+  Serial.print(" | Range: ±"); Serial.print(limitRange);
+  Serial.print(" | Servo: "); Serial.println(limitedAngle);
+
+  delay(15);
+}
+</code></pre>
+
+  <h2>Additional Questions</h2>
+
+  <h3>Q1) Graph the signal at Pin 9 for the sweep loop</h3>
+  <p>
+    Pin 9 outputs a standard servo control PWM (a 20 ms frame; pulse width ≈ 1.0–2.0 ms). 
+    As the code steps <code>pos</code> from 0→180 with a <code>delay(100)</code>, the pulse width slowly grows 
+    from ~1.0 ms to ~2.0 ms while the low portion shrinks to keep the total period ~20 ms.
+  </p>
+  <img src="A4_Q1.jpeg" alt="PWM timing graph for servo pulses at pin 9" width="600">
+  <p><strong>Figure 4.</strong> Voltage at Pin 9 vs time (0–5 V). Each period is ~20 ms; pulse width widens as the angle increases.</p>
+
+  <h3>Q2) 1% erroneous reading (rare bad sample)</h3>
+  <p>
+    Strategy: take a few quick samples and use a <em>median</em> (or retry-once) so a rare outlier doesn’t affect control.
+  </p>
+
+  <pre><code>// Pseudo/Arduino-ish
+int safeAnalogRead(int pin) {
+  int a = analogRead(pin);
+  int b = analogRead(pin);
+  int c = analogRead(pin);
+
+  // median of three (rejects a single outlier)
+  if ((a &lt;= b &amp;&amp; b &lt;= c) || (c &lt;= b &amp;&amp; b &lt;= a)) return b;
+  if ((b &lt;= a &amp;&amp; a &lt;= c) || (c &lt;= a &amp;&amp; a &lt;= b)) return a;
+  return c;
+}
+
+// usage
+int x = safeAnalogRead(A0);
+</code></pre>
+
+  <h3>Q3) ±10% random noise (jitter)</h3>
+  <p>
+    Strategy: apply a small smoothing filter so quick, random swings are averaged out. 
+    Either a moving average or an exponential moving average (EMA) is fine; EMA is one line and fast.
+  </p>
+
+  <pre><code>// Exponential Moving Average (0&lt;alpha&lt;1). Smaller alpha = more smoothing.
+int ema(int raw) {
+  static int y = 0;           // holds the smoothed value
+  const float alpha = 0.2;    // pick 0.1–0.3 for gentle smoothing
+  y = (int)(alpha * raw + (1 - alpha) * y);
+  return y;
+}
+
+// usage
+int raw = analogRead(A0);
+int smoothed = ema(raw);
+</code></pre>
+
+  <p>
+    Why these work: Q2’s 1% bad samples are isolated spikes—median-of-3 ignores them. 
+    Q3’s ±10% noise is frequent, so smoothing reduces variation while still tracking real motion.
+  </p>
+
+
+</body>
+</html>

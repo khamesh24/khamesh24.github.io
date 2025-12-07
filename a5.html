@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Assignment 5 — High(er) Voltages: IR Remote → N-MOSFET → 12 V LED Strip</title>
+</head>
+<body>
+  <h1>Assignment 5 — High(er) Voltages</h1>
+  <p>
+    Goal: use an <strong>N-MOSFET</strong> with an <strong>external 12 V supply</strong> to power a high-load device
+    (12 V LED strip) while the Arduino supplies logic only. Brightness is controlled by an
+    <strong>IR remote</strong> (via the <code>IRremote</code> library) and <code>analogWrite()</code> PWM.
+  </p>
+
+
+  <h2>Schematic</h2>
+  <figure>
+    <img src="A5_Schematic.jpeg" alt="Schematic placeholder" style="max-width:50%; height:auto;">
+    <figcaption>
+      Figure 1. N-MOSFET low-side switch. PWM at D5, 100–220 Ω in series to the gate, 100 kΩ pulldown.
+      12 V supply powers the strip; Arduino and 12 V share ground.
+    </figcaption>
+  </figure>
+
+  <h2>Circuit Photo</h2>
+  <figure>
+    <img src="A5_circuit_photo.jpeg" alt="Circuit photo placeholder" style="max-width:50%; height:auto;">
+    <figcaption>Figure 2. Breadboard build matching the schematic.</figcaption>
+  </figure>
+
+  <h2>Operation (Animated GIF)</h2>
+  <figure>
+    <img src="A5_operation.gif" alt="Operation GIF placeholder" style="max-width:100%; height:auto;">
+    <figcaption>Figure 3. Dimming and toggling the LED strip with the IR remote.</figcaption>
+  </figure>
+
+  <hr>
+
+  <h2>Why these values?</h2>
+  <ul>
+    <li><strong>Gate series 100–220 Ω:</strong> tames dV/dt and ringing, limits inrush on the gate when PWM switches.</li>
+    <li><strong>Gate pulldown 100 kΩ:</strong> keeps MOSFET <em>off</em> during reset/boot so the strip does not flash.</li>
+    <li><strong>PWM @ D5:</strong> hardware PWM drives brightness 0–255 with <code>analogWrite()</code>.</li>
+  </ul>
+
+  <h3>Current &amp; power justification</h3>
+  <ul>
+    <li>Example strip: ~1 m (60 LED/m white) ≈ <strong>1.2 A</strong> at full brightness.</li>
+    <li>MOSFET conduction loss: \(P \approx I^{2}R_{DS(on)}\). If \(R_{DS(on)} = 0.02\,\Omega\), \(P \approx (1.2)^2 \cdot 0.02 \approx 0.029\,W\) → cool.</li>
+    <li>12 V adapter must be rated ≥ load current (e.g., 12 V 2 A gives headroom).</li>
+  </ul>
+
+  <hr>
+
+  <h2>Firmware (with per-line comments)</h2>
+  <p><em>Library:</em> <code>IRremote</code> v3+ (Install via Library Manager). The codes below are examples; replace with your own
+    <code>command</code> bytes learned from your remote.</p>
+
+  <pre>
+  // include the IRremote library (v3+ API)
+  #include &lt;IRremote.hpp&gt;
+
+  // pick the IR receiver output pin
+  const int IR_PIN  = 11;   // VS1838 OUT -> D11
+
+  // pick a PWM-capable pin to drive the MOSFET gate
+  const int FET_PIN = 5;    // gate -> 100–220Ω -> D5
+
+  // track current brightness value for PWM
+  int duty = 0;             // 0..255
+
+  // how much we change per button press
+  const int STEP = 15;      // step size
+
+  // set your learned IR command bytes here (examples shown)
+  int CMD_UP     = 0x09;    // brightness up
+  int CMD_DOWN   = 0x07;    // brightness down
+  int CMD_TOGGLE = 0x45;    // on/off toggle
+
+  // helper: clamp and write PWM, keep 'duty' in sync
+  void applyDuty(int v) {
+    // limit 0..255 to avoid overflow/underflow
+    v = constrain(v, 0, 255);
+    // write the PWM to the MOSFET gate
+    analogWrite(FET_PIN, v);
+    // remember the current level
+    duty = v;
+  }
+
+  void setup() {
+    // set the gate pin as OUTPUT so Arduino actively drives it
+    pinMode(FET_PIN, OUTPUT);
+    // start OFF so the strip doesn't flash at boot
+    applyDuty(0);
+    // start IR receiver with feedback LED enabled
+    IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
+  }
+
+  void loop() {
+    // if no IR frame available, do nothing this cycle
+    if (!IrReceiver.decode()) return;
+
+    // many remotes send 'repeat' frames while held — ignore those for single steps
+    if (IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) {
+      // tell the receiver we're ready for the next frame
+      IrReceiver.resume();
+      // skip the rest
+      return;
+    }
+
+    // get the decoded 8-bit command field (protocol-specific in v3+)
+    int cmd = IrReceiver.decodedIRData.command;
+
+    // toggle on/off at a comfy brightness, or nudge up/down by STEP
+    if (cmd == CMD_TOGGLE) {
+      applyDuty(duty ? 0 : 180);          // quick toggle
+    } else if (cmd == CMD_UP) {
+      applyDuty(duty + STEP);             // brighter
+    } else if (cmd == CMD_DOWN) {
+      applyDuty(duty - STEP);             // dimmer
+    }
+
+    // accept the next IR packet
+    IrReceiver.resume();
+    // tiny pause keeps the loop responsive but not too chatty
+    delay(5);
+  }
+  </pre>
+
+  <hr>
+
+  <h2>Additional Questions</h2>
+
+  <h3>Q1) Absolute max current between MOSFET pins 2 and 3?</h3>
+  <p>
+    For the DMT6009LCT N-MOSFET, the datasheet lists <strong>continuous drain current</strong> (Drain↔Source, pins 2↔3)
+    as <strong>37.2 A at 25 °C</strong> (case) and <strong>29.8 A at 100 °C</strong>, and the <strong>pulsed</strong> drain
+    current as <strong>80 A</strong> (10 µs pulse, 1% duty). In practice my strip uses ~1.2 A, well below these limits.
+  </p>
+
+  <h3>Q2) Schematic with Arduino, DC motor, flyback diode, and capacitors</h3>
+  <figure>
+    <img src="A5_Q2.jpeg" style="max-width:50%; height:auto;">
+  </figure>
+
+  <h3>Q3) L293D: Arduino + chip + two motors (+ pseudo-code)</h3>
+  <figure>
+    <img src="A5_Q3.jpeg" style="max-width:50%; height:auto;">
+  </figure>
+
+  <p><strong>Pseudo-code:</strong></p>
+  <pre>
+// assume M1: IN1/IN2, M2: IN3/IN4; ENA/ENB HIGH to enable
+// both forward
+set(IN1,HIGH); set(IN2,LOW);
+set(IN3,HIGH); set(IN4,LOW);
+delay(t);
+
+// both back
+set(IN1,LOW);  set(IN2,HIGH);
+set(IN3,LOW);  set(IN4,HIGH);
+delay(t);
+
+// one fwd, one back
+set(IN1,HIGH); set(IN2,LOW);
+set(IN3,LOW);  set(IN4,HIGH);
+delay(t);
+
+// swap
+set(IN1,LOW);  set(IN2,HIGH);
+set(IN3,HIGH); set(IN4,LOW);
+delay(t);
+  </pre>
+
+
+  <hr>
+
+
+ 
+</body>
+</html>
