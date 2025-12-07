@@ -72,11 +72,11 @@ byte colPins[COLS] = {10, A0, A1, A2};  // C1..C4 -> D10,A0,A1,A2
 // create keypad object
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-/* ---------- Reset button ---------- */
+//Reset button 
 // choose the reset button pin
 const int RESET_PIN = A3;  // button to GND; uses INPUT_PULLUP
 
-/* ---------- Safe state ---------- */
+//Safe state
 // set your secret PIN here
 const char* MASTER_PIN = "1234";
 // hold what the user has typed
@@ -100,7 +100,7 @@ void lcdIdle() {
   for (uint8_t i = 0; i < entered.length(); i++) lcd.print('*');
   // fill rest with spaces
   for (uint8_t i = entered.length(); i < 16; i++) lcd.print(' ');
-  // inform host over serial (optional)
+  // inform host over serial
   Serial.println("STATE:IDLE");
 }
 
@@ -127,7 +127,7 @@ void handleResetButton() {
 
 //handle a single line command from Serial
 void handleSerialCommand(const String& s) {
-  // handle "TEXT:line1|line2" to set LCD text (optional)
+  // handle "TEXT:line1|line2" to set LCD text 
   if (s.startsWith("TEXT:")) {
     // grab payload after "TEXT:"
     String payload = s.substring(5);
@@ -199,7 +199,7 @@ void setup() {
 void loop() {
   // check reset button
   handleResetButton();
-  // read serial commands (optional)
+  // read serial commands 
   readSerialLines();
 
   // only process keypad if not unlocked
