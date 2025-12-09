@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Final Project — IR-Controlled RGB Night Light</title>
+</head>
+<body>
+  <h1>IR-Controlled RGB Night Light</h1>
+
+  <h2>Concept</h2>
+  <p>
+    The <strong>IR RGB Night Light</strong> is a compact lighting system controlled by a standard infrared remote.
+    It uses an Arduino board to read IR signals and mix red, green, and blue light using PWM outputs.
+    The remote can toggle power, adjust brightness, and switch between seven distinct bright color presets.
+    The design supports multiple RGB LEDs wired in sync, allowing consistent lighting from a small, 3D-printed dome enclosure.
+    For my enclosure, I used a 3D print model that I found on the web and made a few edits to it to make a diffuser and fit my components.
+    The enclosure is inspired by the game "Hollow Knight" and I initially planned to place my circuit in the dome but due to size constraints
+    with the 3D print I was not able to fit it inside. To work around this I placed a small box below my model where the circuit is placed
+    and I used M to F jumper wires to connect the circuit to the LEDs that are inside the dome. This does greatly affect the aesthetic of the final product
+    but this is an improvement I would like to make in the future by simply scaling up the original model.
+  </p>
+
+  <h2>Technical Implementation</h2>
+
+  <h3>Bill of Materials</h3>
+  <ul>
+    <li>Elegoo Uno R3 (Arduino-compatible)</li>
+    <li>IR receiver module (3-pin: R=5V, Y=Signal, G=GND)</li>
+    <li>RGB LED (common-cathode or common-anode)</li>
+    <li>Resistors: 2 x (220 Ω for red and green and 100 Ω for the blue)</li>
+    <li>Breadboard or prototype shield, jumper wires</li>
+    <li>USB power or 9V battery (for enclosure use)</li>
+  </ul>
+
+  <h3>Pin Map</h3>
+  <ul>
+    <li>IR receiver: <strong>Y to D2</strong>, R to 5V, G to GND</li>
+    <li>RGB LED: <strong>Red to D9</strong>, <strong>Green to D10</strong>, <strong>Blue to D5</strong> (each through 220–330 Ω resistors)</li>
+    <li>Common pin: GND (for common-cathode)</li>
+  </ul>
+  
+  <h3>Schematic</h3>
+  <figure>
+    <img src="Final_project_schematic.jpeg" alt="Schematic" style="max-width:50%;height:auto;" />
+    <figcaption>Figure 1. Circuit schematic</figcaption>
+  </figure>
+
+  <h3>Circuit Photo</h3>
+  <figure>
+    <img src="final_project_circuit_photo.jpeg" alt="Circuit photo" style="max-width:50%; height:auto;" />
+    <figcaption>Figure 2.prototype build photo.</figcaption>
+  </figure>
+
+  <h3>Operation (Demo GIF)</h3>
+  <figure>
+    <img src="final_project_operation.gif" alt="Operation GIF" style="max-width:50%;height:auto;" />
+    <figcaption>Figure 3. IR remote changing LED colors and brightness.</figcaption>
+  </figure>
+
+  <h3>Demo Video</h3>
+  <p>
+    <a href="https://youtube.com/shorts/dJuvlHHrAUU?si=dvEaUyyXpdmurX-v">Demo Video (YouTube link)</a>
+  </p>
+
+  <h2>How It Works</h2>
+  <p>
+    The IR receiver detects signals from the remote and sends them to the Uno via pin D2.
+    The <code>IRremote</code> library decodes these signals into unique hexadecimal codes.
+    Each button press corresponds to a specific command - power toggle, brightness up/down, or a preset color.
+    The Uno adjusts the RGB LED outputs using PWM on pins D9, D10, and D5 to mix light and display the selected color.
+    For two LEDs in sync, each LED’s R, G, and B legs connect to the same output pins through individual resistors.
+  </p>
+
+  <h2>Arduino Code</h2>
+  <pre><code>#include &lt;IRremote.hpp&gt; // IR remote library
+
+    // pins
+    int IR_PIN = 2;    // IR receiver signal
+    int PIN_R  = 9;    // red
+    int PIN_G  = 10;   // green
+    int PIN_B  = 5;    // blue
+    
+    // brightness + power
+    int masterBrightness = 255;  // 0..255
+    int BRIGHT_STEP = 25;        // step per press
+    bool isOn = true;            // light on/off
+    
+    // current color
+    int currR = 255, currG = 255, currB = 255;
+    
+    // your IR button codes
+    int CMD_POWER = 0x45;
+    int CMD_UP    = 0x09;
+    int CMD_DOWN  = 0x07;
+    int CMD_1     = 0x16;
+    int CMD_2     = 0x0C;
+    int CMD_3     = 0x18;
+    int CMD_4     = 0x5E;
+    int CMD_5     = 0x08;
+    int CMD_6     = 0x5A;
+    int CMD_7     = 0x42;
+    
+    // send RGB to the LEDs 
+    void writeRGB(int r, int g, int b) {
+      int R = r * masterBrightness / 255;
+      int G = g * masterBrightness / 255;
+      int B = b * masterBrightness / 255;
+    
+      analogWrite(PIN_R, R);
+      analogWrite(PIN_G, G);
+      analogWrite(PIN_B, B);
+    }
+    
+    // set a new color
+    void setColor(int r, int g, int b) {
+      currR = r; currG = g; currB = b;
+      writeRGB(r, g, b);
+    }
+    
+    // nudge brightness up/down
+    void bumpBrightness(int d) {
+      masterBrightness = constrain(masterBrightness + d, 0, 255);
+      writeRGB(currR, currG, currB);
+    }
+    
+    // on/off toggle
+    void togglePower() {
+      isOn = !isOn;
+      if (!isOn) writeRGB(0,0,0);
+      else       writeRGB(currR, currG, currB);
+    }
+    
+    void setup() {
+      pinMode(PIN_R, OUTPUT);
+      pinMode(PIN_G, OUTPUT);
+      pinMode(PIN_B, OUTPUT);
+    
+      Serial.begin(9600);
+      IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
+    
+      writeRGB(currR, currG, currB);
+      Serial.println("IR RGB Night Light (common-cathode) ready!");
+    }
+    
+    void handleCommand(int cmd) {
+      if (cmd == CMD_POWER) togglePower();
+      else if (cmd == CMD_UP)   bumpBrightness(+BRIGHT_STEP);
+      else if (cmd == CMD_DOWN) bumpBrightness(-BRIGHT_STEP);
+    
+      // bright, distinct presets
+      else if (cmd == CMD_1) setColor(255,  20,  20);   // red
+      else if (cmd == CMD_2) setColor(  0, 255,  50);   // lime
+      else if (cmd == CMD_3) setColor(  0,  70, 255);   // royal blue
+      else if (cmd == CMD_4) setColor(255, 255, 255);   // white
+      else if (cmd == CMD_5) setColor(  0, 255, 200);   // aqua
+      else if (cmd == CMD_6) setColor(255,   0, 180);   // magenta
+      else if (cmd == CMD_7) setColor(255, 150,   0);   // orange
+    }
+    
+    void loop() {
+      if (!IrReceiver.decode()) return;
+    
+      // ignore held-button repeats
+      if (IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) {
+        IrReceiver.resume();
+        return;
+      }
+    
+      handleCommand(IrReceiver.decodedIRData.command);
+      IrReceiver.resume();
+    }
+</code></pre>
+
+</body>
+</html>
