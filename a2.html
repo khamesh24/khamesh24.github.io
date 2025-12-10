@@ -49,7 +49,7 @@
     <img src="PWM_graph.jpeg" alt="Chart of LED voltage vs time for PWM analogWrite(64), (128), (255)." style="width:50%; height:auto;"/>
     <figcaption>
       Figure 4. PWM waveforms for <code>analogWrite(64)</code> (~25%), <code>analogWrite(128)</code> (~50%), and
-      <code>analogWrite(255)</code> (100%). The LED voltage toggles between its forward voltage (~V<sub>f</sub>) and 0 V
+      <code>analogWrite(255)</code> (100%). The LED voltage toggles between its forward voltage and 0 V
       at the Arduino’s PWM frequency (~490 Hz on most Uno pins).
     </figcaption>
   </figure>
@@ -167,12 +167,12 @@ void loop() {
 
   <h3>2) Battery-life estimate (1200&nbsp;mAh)</h3>
   <p>
-    Red (220&nbsp;Ω, V drop = 1.8&nbsp;V) ⇒ I≈14.1&nbsp;mA;
-    Green (220&nbsp;Ω, V drop 1.8&nbsp;V) ⇒ I≈13.2&nbsp;mA; Blue (100&nbsp;Ω, V drop = 3.3&nbsp;V) ⇒ I≈14.2&nbsp;mA.
+    Red (220&nbsp;Ω, V drop = 1.8&nbsp;V); I≈14.1&nbsp;mA;
+    Green (220&nbsp;Ω, V drop 1.8&nbsp;V); I≈13.2&nbsp;mA; Blue (100&nbsp;Ω, V drop = 3.3&nbsp;V)' I≈14.2&nbsp;mA.
   </p>
   <ul>
     <li><strong>Idle (blue off, red + green steady):</strong> Current ≈ 28.3&nbsp;mA → 1200/28.3 ≈ <strong>42.4 hours</strong> (LEDs only).</li>
-    <li><strong>Pressed (red+green steady, blue fading ~50% duty avg):</strong> Current ≈ 20.8&nbsp;mA → 1200/20.8 ≈ <strong>57.7 hours</strong> (LEDs only).</li>
+    <li><strong>Pressed (red+green steady, blue fading ~50% duty avg):</strong> Current ≈ 20.8&nbsp;mA; 1200/20.8 ≈ <strong>57.7 hours</strong> (LEDs only).</li>
   </ul>
   <p>
     Real-world lifetime will probably be shorter because I believe the Arduino board itself consumes ~25–35&nbsp;mA.
@@ -186,7 +186,7 @@ void loop() {
 
   <h3>4) Use of AI Tools</h3>
   <p>
-    I used AI tools to help format documentation, clarify PWM duty cycle and battery-life estimates. I verified behavior on hardware and matched the schematic, circuit, and code.
+    I used AI tools to help format documentation, and battery-life estimates. I verified behavior on hardware and matched the schematic, circuit, and code.
   </p>
 
   <hr />

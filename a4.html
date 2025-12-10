@@ -48,7 +48,7 @@ void setup() {
   int xCenter;
   const int deadband = 20;
 
-  // --- Calibrate joystick center ---
+  //Calibrate the joystick center
   long sum = 0; // store total of samples
   for (int i = 0; i &lt; 50; i++) { // take 50 readings for accuracy
     sum += analogRead(xPin); // read joystick X value
